@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Домашнее задание</title>
+</head>
+<body>
+    <h1>Итоговое домашнее задание</h1>
+    <p>Дисциплина: «Основы виртуализации и контейнеризации»</p>
+    <hr>
+    
+    <h2>Статус системы</h2>
+    <ul>
+        <li>База данных: <b id="db-status">Загрузка...</b></li>
+        <li>Node.js: <span id="node-ver">Загрузка...</span></li>
+        <li>Операционная система ВМ: <span id="os-ver">Загрузка...</span></li>
+    </ul>
+
+    <h2>Статистика просмотров</h2>
+    <p>Количество просмотров страницы из БД: <b id="views-count">0</b></p>
+    <p>Текущее время в PostgreSQL: <span id="db-time">Загрузка...</span></p>
+
+    <hr>
+
+    <h2>Отправить сообщение в PostgreSQL</h2>
+    <form id="msg-form">
+        Имя: <input type="text" id="msg-name" required><br><br>
+        Сообщение: <input type="text" id="msg-text" size="40" required><br><br>
+        <button type="submit">Отправить</button>
+    </form>
+
+    <h2>Записи в базе данных:</h2>
+    <ul id="messages-list">
+        <li>Загрузка сообщений...</li>
+    </ul>
+
+    <script>
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    document.getElementById('db-status').innerText = 'Подключено к БД';
+                    document.getElementById('views-count').innerText = data.totalViews;
+                    document.getElementById('node-ver').innerText = data.environment.nodeVersion;
+                    document.getElementById('os-ver').innerText = `${data.environment.platform} (${data.environment.osRelease})`;
+                    document.getElementById('db-time').innerText = new Date(data.dbTime).toLocaleString();
+                } else {
+                    document.getElementById('db-status').innerText = 'Ошибка подключения к БД';
+                }
+            } catch (e) {
+                document.getElementById('db-status').innerText = 'БД Недоступна';
+            }
+        }
+
+        async function loadMessages() {
+            try {
+                const res = await fetch('/api/guestbook');
+                const messages = await res.json();
+                const list = document.getElementById('messages-list');
+                list.innerHTML = '';
+                if (messages.length === 0) {
+                    list.innerHTML = '<li>Записей пока нет</li>';
+                    return;
+                }
+                messages.forEach(msg => {
+                    const li = document.createElement('li');
+                    li.innerText = `${msg.name}: "${msg.message}" (${new Date(msg.created_at).toLocaleString()})`;
+                    list.appendChild(li);
+                });
+            } catch (e) {
+                document.getElementById('messages-list').innerHTML = '<li>Не удалось загрузить сообщения</li>';
+            }
+        }
+
+        document.getElementById('msg-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nameInput = document.getElementById('msg-name');
+            const msgInput = document.getElementById('msg-text');
+            const name = nameInput.value.trim();
+            const message = msgInput.value.trim();
+            
+            if (!name || !message) return;
+            
+            try {
+                const res = await fetch('/api/guestbook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, message })
+                });
+                if (res.ok) {
+                    msgInput.value = '';
+                    loadStats();
+                    loadMessages();
+                }
+            } catch (err) {
+                alert('Ошибка отправки');
+            }
+        });
+
+        window.onload = () => {
+            loadStats();
+            loadMessages();
+        };
+    </script>
+</body>
+</html>

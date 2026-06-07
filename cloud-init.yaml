@@ -1,0 +1,38 @@
+#cloud-config
+users:
+  - default
+  - name: student
+    groups: sudo, docker
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOa1/3xQOp/aUtKRux295dOSeE5pi8jslZ0JxI0MH/y6 stanislavkhoshov@MBP-Stanislav
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - ufw
+
+runcmd:
+  # 1. Set password for student user
+  - echo "student:student" | chpasswd
+  # 2. Install Docker
+  - mkdir -p /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  # 3. Add users to docker group
+  - usermod -aG docker student
+  - usermod -aG docker ubuntu
+  # 4. Setup firewall
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp comment 'allow SSH'
+  - ufw allow 80/tcp comment 'allow HTTP Nginx'
+  - ufw --force enable
